@@ -2,7 +2,7 @@ import AdminDashboard from "./AdminDashboard";
 
 function App() {
   return (
-    <div className="bg-light min-vh-100">
+    <div className="min-vh-100" style={{ backgroundColor: "#e3f2fd" }}>
       {/* Header */}
       <nav className="navbar navbar-dark bg-primary py-4">
         <div className="container">
