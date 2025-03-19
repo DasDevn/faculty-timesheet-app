@@ -1,64 +1,80 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import axios from "axios";
 
 const AdminDashboard = () => {
-  const [submissions, setSubmissions] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [employeeID, setEmployeeID] = useState("");
+  const [employeeData, setEmployeeData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  // Fetch data from the backend API
-  useEffect(() => {
-    axios.get("http://localhost:5000/api/submissions")
-      .then(response => setSubmissions(response.data))
-      .catch(error => console.error("Error fetching data:", error));
-  }, []);
+  const fetchEmployeeData = async () => {
+    if (!employeeID) return;
 
-  // Filter submissions based on User ID (EmployeeID)
-  const filteredSubmissions = submissions.filter((sub) =>
-    sub.EmployeeID.toString().includes(searchQuery)
-  );
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await axios.get(`http://localhost:5000/api/employee/${employeeID}`);
+      setEmployeeData(response.data);
+    } catch (err) {
+      setError("Failed to fetch data. Please try again.");
+      console.error("API Error:", err);
+    }
+
+    setLoading(false);
+  };
 
   return (
     <div className="card p-4 shadow-sm">
       {/* Search Bar */}
-      <input
-        type="text"
-        placeholder="Search by Employee ID..."
-        className="form-control mb-3"
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-      />
-
-      {/* Table */}
-      <div className="table-responsive">
-        <table className="table table-bordered table-striped">
-          <thead className="table-primary">
-            <tr>
-              <th>Report ID</th>
-              <th>Employee ID</th>
-              <th>Submission Date</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSubmissions.length > 0 ? (
-              filteredSubmissions.map((sub) => (
-                <tr key={sub.SubmissionID}>
-                  <td>{sub.SubmissionID}</td>
-                  <td>{sub.EmployeeID}</td>
-                  <td>{sub.SubmissionDate}</td>
-                  <td>{sub.Submitted ? "Yes" : "No"}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="4" className="text-center text-muted">
-                  No results found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      <div className="mb-3">
+        <input
+          type="text"
+          placeholder="Enter Employee ID..."
+          className="form-control"
+          value={employeeID}
+          onChange={(e) => setEmployeeID(e.target.value)}
+        />
+        <button className="btn btn-primary mt-2" onClick={fetchEmployeeData} disabled={loading}>
+          {loading ? "Searching..." : "Search"}
+        </button>
       </div>
+
+      {/* Display Results */}
+      {error && <p className="text-danger">{error}</p>}
+
+      {employeeData && (
+        <div className="mt-4">
+          {/* Time Report Submissions Table */}
+          <h4>Time Report Submissions</h4>
+          <table className="table table-bordered table-striped">
+            <thead className="table-primary">
+              <tr>
+                <th>Submission ID</th>
+                <th>Period</th>
+                <th>Submission Date</th>
+                <th>Submitted</th>
+              </tr>
+            </thead>
+            <tbody>
+              {employeeData.submissions.length > 0 ? (
+                employeeData.submissions.map((sub) => (
+                  <tr key={sub.SubmissionID}>
+                    <td>{sub.SubmissionID}</td>
+                    <td>{sub.Period}</td>  {/* Now using Period column */}
+                    <td>{sub.SubmissionDate}</td>
+                    <td>{sub.Submitted ? "Yes" : "No"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4" className="text-center text-muted">No records found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
