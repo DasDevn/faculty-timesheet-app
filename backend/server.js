@@ -7,15 +7,15 @@ const app = express();
 app.use(cors()); // Allow frontend to access API
 app.use(express.json()); // Middleware to parse JSON
 
-// Database configuration (replace with your actual values)
+
 const dbConfig = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   server: process.env.DB_SERVER,
   database: process.env.DB_NAME,
   options: {
-    encrypt: true, // Use true if your server requires encryption
-    trustServerCertificate: true, // Change to false in production
+    encrypt: true,
+    trustServerCertificate: true, 
   }
 };
 
