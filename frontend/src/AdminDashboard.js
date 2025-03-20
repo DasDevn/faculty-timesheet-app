@@ -1,4 +1,3 @@
-// AdminDashboard.js
 import React, { useState } from "react";
 import axios from "axios";
 
@@ -9,11 +8,21 @@ const AdminDashboard = () => {
   const [error, setError] = useState("");
   const [expandedSubmissionId, setExpandedSubmissionId] = useState(null);
 
-  // Toggle which submission row is expanded
+  // New state for adding an employee
+  const [newEmployee, setNewEmployee] = useState({
+    Email: "",
+    FirstName: "",
+    LastName: ""
+  });
+  const [addSuccess, setAddSuccess] = useState("");
+  const [addError, setAddError] = useState("");
+
+  // Toggle expanded submission
   const toggleExpanded = (submissionId) => {
     setExpandedSubmissionId((prev) => (prev === submissionId ? null : submissionId));
   };
 
+  // Fetch employee data
   const fetchEmployeeData = async () => {
     if (!employeeID) return;
 
@@ -32,9 +41,30 @@ const AdminDashboard = () => {
     setLoading(false);
   };
 
+  // Handle input changes for adding an employee
+  const handleNewEmployeeChange = (e) => {
+    setNewEmployee({ ...newEmployee, [e.target.name]: e.target.value });
+  };
+
+  // Submit new employee to the backend
+  const addEmployee = async () => {
+    setAddSuccess("");
+    setAddError("");
+
+    try {
+      const response = await axios.post("http://localhost:5000/api/employees", newEmployee);
+      setAddSuccess(`Employee added successfully! Generated ID: ${response.data.EmployeeID}`);
+      setNewEmployee({ Email: "", FirstName: "", LastName: "" }); // Reset form
+    } catch (err) {
+      setAddError("Failed to add employee. Please try again.");
+      console.error("Error adding employee:", err);
+    }
+  };
+
   return (
     <div className="card p-4 shadow-sm">
-      {/* Search Bar */}
+      {/* Search Employee */}
+      <h3 className="mb-3">Search Employee</h3>
       <div className="mb-3">
         <input
           type="text"
@@ -43,11 +73,7 @@ const AdminDashboard = () => {
           value={employeeID}
           onChange={(e) => setEmployeeID(e.target.value)}
         />
-        <button
-          className="btn btn-primary mt-2"
-          onClick={fetchEmployeeData}
-          disabled={loading}
-        >
+        <button className="btn btn-primary mt-2" onClick={fetchEmployeeData} disabled={loading}>
           {loading ? "Searching..." : "Search"}
         </button>
       </div>
@@ -59,26 +85,21 @@ const AdminDashboard = () => {
       {employeeData && (
         <div className="mt-4">
           <h4>
-            Time Report Submissions for:{" "}
-            <strong>
-              {employeeData.FirstName} {employeeData.LastName}
-            </strong>
+            Time Report Submissions for: <strong>{employeeData.FirstName} {employeeData.LastName}</strong>
           </h4>
 
-          {/* Time Report Submissions Table */}
           <table className="table table-bordered table-striped mt-3">
             <thead className="table-primary">
               <tr>
                 <th>Reporting Period</th>
                 <th>Submitted</th>
                 <th>Submission Date</th>
-                <th></th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {employeeData.submissions.length > 0 ? (
                 employeeData.submissions.map((sub) => {
-                  // Find matching time-off records for the period
                   const matchingTimeOff = employeeData.timeOffRecords.filter(
                     (record) => record.PeriodID === sub.PeriodID
                   );
@@ -88,22 +109,16 @@ const AdminDashboard = () => {
                       <tr>
                         <td>{sub.Period}</td>
                         <td>{sub.Submitted ? "Yes" : "No"}</td>
-                        <td>{sub.SubmissionDate}</td>
+                        <td>{sub.SubmissionDate?.split("T")[0]}</td>
                         <td>
-                          <button
-                            className="btn btn-sm btn-secondary"
-                            onClick={() => toggleExpanded(sub.SubmissionID)}
-                          >
-                            {expandedSubmissionId === sub.SubmissionID
-                              ? "Hide Time Off"
-                              : "Show Time Off"}
+                          <button className="btn btn-sm btn-secondary" onClick={() => toggleExpanded(sub.SubmissionID)}>
+                            {expandedSubmissionId === sub.SubmissionID ? "Hide Time Off" : "Show Time Off"}
                           </button>
                         </td>
                       </tr>
 
                       {expandedSubmissionId === sub.SubmissionID && (
                         <tr>
-                          {/* Expanded row - colSpan must match the number of columns */}
                           <td colSpan="4">
                             {matchingTimeOff.length > 0 ? (
                               <table className="table table-sm table-bordered mt-2">
@@ -127,9 +142,7 @@ const AdminDashboard = () => {
                                 </tbody>
                               </table>
                             ) : (
-                              <p className="text-muted mb-0">
-                                No time off records for this period.
-                              </p>
+                              <p className="text-muted mb-0">No time off records for this period.</p>
                             )}
                           </td>
                         </tr>
@@ -139,15 +152,23 @@ const AdminDashboard = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="4" className="text-center text-muted">
-                    No records found
-                  </td>
+                  <td colSpan="4" className="text-center text-muted">No records found</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       )}
+
+      {/* Add Employee Section */}
+      <h3 className="mt-4">Add Employee</h3>
+      <input type="email" name="Email" placeholder="Email" className="form-control mb-2" value={newEmployee.Email} onChange={handleNewEmployeeChange} />
+      <input type="text" name="FirstName" placeholder="First Name" className="form-control mb-2" value={newEmployee.FirstName} onChange={handleNewEmployeeChange} />
+      <input type="text" name="LastName" placeholder="Last Name" className="form-control mb-2" value={newEmployee.LastName} onChange={handleNewEmployeeChange} />
+      <button className="btn btn-success mt-2" onClick={addEmployee}>Add Employee</button>
+
+      {addSuccess && <p className="text-success mt-2">{addSuccess}</p>}
+      {addError && <p className="text-danger mt-2">{addError}</p>}
     </div>
   );
 };

@@ -127,6 +127,35 @@ app.get('/api/employee/:employeeID', async (req, res) => {
   }
 });
 
+app.post('/api/employees', async (req, res) => {
+  const { Email, FirstName, LastName } = req.body;
+
+  if (!Email || !FirstName || !LastName) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
+  // Extract EmployeeID from email (before @ symbol)
+  const EmployeeID = Email.split('@')[0];
+
+  try {
+    const pool = await sql.connect(dbConfig);
+    await pool.request()
+      .input('EmployeeID', sql.NVarChar, EmployeeID)
+      .input('Email', sql.NVarChar, Email)
+      .input('FirstName', sql.NVarChar, FirstName)
+      .input('LastName', sql.NVarChar, LastName)
+      .query(`
+        INSERT INTO Users (EmployeeID, Email, FirstName, LastName)
+        VALUES (@EmployeeID, @Email, @FirstName, @LastName)
+      `);
+
+    res.status(201).json({ message: "Employee added successfully", EmployeeID });
+  } catch (err) {
+    console.error("Error adding employee:", err);
+    res.status(500).json({ error: "Failed to add employee" });
+  }
+});
+
 // Start the server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
