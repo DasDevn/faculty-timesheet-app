@@ -1,12 +1,14 @@
+// server.js (or index.js)
 const express = require('express');
 const sql = require('mssql');
 const cors = require('cors');
-require('dotenv').config(); // Load environment variables
+require('dotenv').config(); // Load environment variables from .env
 
 const app = express();
-app.use(cors()); // Allow frontend to access API
-app.use(express.json()); // Middleware to parse JSON
+app.use(cors());
+app.use(express.json());
 
+// Replace these with your actual environment variables or values
 const dbConfig = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
@@ -15,10 +17,10 @@ const dbConfig = {
   options: {
     encrypt: true,
     trustServerCertificate: true, 
-  }
+  },
 };
 
-// Test database connection
+// Test connection
 async function connectDB() {
   try {
     await sql.connect(dbConfig);
@@ -27,9 +29,9 @@ async function connectDB() {
     console.error("Database connection failed:", err);
   }
 }
-connectDB(); // Run connection test
+connectDB();
 
-// API endpoint to fetch all submissions
+// [Optional] Endpoint to fetch all submissions (not crucial for the new feature)
 app.get('/api/submissions', async (req, res) => {
   try {
     const pool = await sql.connect(dbConfig);
@@ -41,59 +43,89 @@ app.get('/api/submissions', async (req, res) => {
   }
 });
 
-// New API: Get all records by Employee ID
+/**
+ * API endpoint to fetch employee data by ID, including:
+ *   - Submissions (with PeriodID, StartDate, EndDate, etc.)
+ *   - TimeOffRecords
+ *   - ReportingPeriods (optional)
+ *   - User's first and last name
+ */
 app.get('/api/employee/:employeeID', async (req, res) => {
   const { employeeID } = req.params;
 
   try {
     const pool = await sql.connect(dbConfig);
 
-    // ✅ Fetch Time Report Submissions with Period
+    // 1) Get user info (FirstName, LastName) from the Users table
+    const userQuery = await pool.request()
+      .input('EmployeeID', sql.NVarChar, employeeID)
+      .query(`SELECT TOP 1 FirstName, LastName
+              FROM Users
+              WHERE EmployeeID = @EmployeeID`);
+
+    // 2) Get Time Report Submissions joined with ReportingPeriods
     const submissionsQuery = await pool.request()
+    .input('EmployeeID', sql.NVarChar, employeeID)
+    .query(`
+      SELECT trs.SubmissionID,
+            trs.EmployeeID,
+            trs.PeriodID,
+            CONVERT(VARCHAR(10), rp.StartDate, 23) AS StartDate,
+            CONVERT(VARCHAR(10), rp.EndDate, 23)   AS EndDate,
+            CONVERT(VARCHAR(10), trs.SubmissionDate, 23) AS SubmissionDate,
+            trs.Submitted
+      FROM TimeReportSubmissions trs
+      INNER JOIN ReportingPeriods rp ON trs.PeriodID = rp.PeriodID
+      WHERE trs.EmployeeID = @EmployeeID
+    `);
+
+
+    // 3) Get all Time Off Records for the employee
+    const timeOffRecordsQuery = await pool.request()
       .input('EmployeeID', sql.NVarChar, employeeID)
-      .query(`SELECT trs.SubmissionID, trs.EmployeeID, trs.PeriodID, 
-                     CONVERT(VARCHAR, rp.StartDate, 23) AS StartDate, 
-                     CONVERT(VARCHAR, rp.EndDate, 23) AS EndDate, 
-                     CONVERT(VARCHAR, trs.SubmissionDate, 23) AS SubmissionDate, 
-                     trs.Submitted
-              FROM TimeReportSubmissions trs
-              INNER JOIN ReportingPeriods rp ON trs.PeriodID = rp.PeriodID
-              WHERE trs.EmployeeID = @EmployeeID`);
+      .query(`SELECT *
+              FROM TimeOffRecords
+              WHERE EmployeeID = @EmployeeID`);
 
-    console.log("Submissions Data:", submissionsQuery.recordset); // Debug log
-
-    const timeOffRecords = await pool.request()
+    // 4) Optionally get all relevant ReportingPeriods (if needed)
+    const reportingPeriodsQuery = await pool.request()
       .input('EmployeeID', sql.NVarChar, employeeID)
-      .query("SELECT * FROM TimeOffRecords WHERE EmployeeID = @EmployeeID");
+      .query(`
+        SELECT *
+        FROM ReportingPeriods
+        WHERE PeriodID IN (
+          SELECT PeriodID
+          FROM TimeReportSubmissions
+          WHERE EmployeeID = @EmployeeID
+        )
+      `);
 
-    const reportingPeriods = await pool.request()
-      .input('EmployeeID', sql.NVarChar, employeeID)
-      .query("SELECT * FROM ReportingPeriods WHERE PeriodID IN (SELECT PeriodID FROM TimeReportSubmissions WHERE EmployeeID = @EmployeeID)");
-
+    // Process data: We'll include the raw PeriodID so we can match it on the frontend
     const submissions = submissionsQuery.recordset.map(sub => ({
       SubmissionID: sub.SubmissionID,
       EmployeeID: sub.EmployeeID,
-      Period: sub.StartDate && sub.EndDate ? `${sub.StartDate} - ${sub.EndDate}` : "N/A", // Handle missing dates
+      PeriodID: sub.PeriodID,
+      Period: (sub.StartDate && sub.EndDate) ? `${sub.StartDate} - ${sub.EndDate}` : "N/A",
       SubmissionDate: sub.SubmissionDate,
       Submitted: sub.Submitted
     }));
 
-    console.log("Processed Submissions:", submissions); // Debug log after formatting
+    // Extract the user's FirstName/LastName from userQuery
+    const userInfo = userQuery.recordset[0] || { FirstName: "", LastName: "" };
 
+    // Respond with all data
     res.json({
+      FirstName: userInfo.FirstName,
+      LastName: userInfo.LastName,
       submissions,
-      timeOffRecords: timeOffRecords.recordset,
-      reportingPeriods: reportingPeriods.recordset
+      timeOffRecords: timeOffRecordsQuery.recordset,
+      reportingPeriods: reportingPeriodsQuery.recordset
     });
-
   } catch (err) {
     console.error("Error fetching employee data:", err);
     res.status(500).json({ error: "Failed to fetch employee data" });
   }
 });
-
-
-
 
 // Start the server
 const PORT = process.env.PORT || 5000;
