@@ -156,6 +156,27 @@ app.post('/api/employees', async (req, res) => {
   }
 });
 
+
+// DELETE a single time off record by TimeOffID
+app.delete('/api/timeoff/:timeOffID', async (req, res) => {
+  const { timeOffID } = req.params;
+
+  try {
+    const pool = await sql.connect(dbConfig);
+    await pool.request()
+      .input('TimeOffID', sql.Int, timeOffID)
+      .query(`DELETE FROM TimeOffRecords WHERE TimeOffID = @TimeOffID`);
+
+    res.json({ message: "Time off record deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting time off record:", err);
+    res.status(500).json({ error: "Failed to delete time off record" });
+  }
+});
+
+
+
+
 // Start the server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

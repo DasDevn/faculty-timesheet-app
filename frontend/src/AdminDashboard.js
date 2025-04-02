@@ -8,7 +8,6 @@ const AdminDashboard = () => {
   const [error, setError] = useState("");
   const [expandedSubmissionId, setExpandedSubmissionId] = useState(null);
 
-  // New state for adding an employee
   const [newEmployee, setNewEmployee] = useState({
     Email: "",
     FirstName: "",
@@ -17,14 +16,12 @@ const AdminDashboard = () => {
   const [addSuccess, setAddSuccess] = useState("");
   const [addError, setAddError] = useState("");
 
-  // Toggle expanded submission
   const toggleExpanded = (submissionId) => {
     setExpandedSubmissionId((prev) =>
       prev === submissionId ? null : submissionId
     );
   };
 
-  // Fetch employee data
   const fetchEmployeeData = async () => {
     if (!employeeID) return;
 
@@ -45,12 +42,10 @@ const AdminDashboard = () => {
     setLoading(false);
   };
 
-  // Handle input changes for adding an employee
   const handleNewEmployeeChange = (e) => {
     setNewEmployee({ ...newEmployee, [e.target.name]: e.target.value });
   };
 
-  // Submit new employee to the backend
   const addEmployee = async () => {
     setAddSuccess("");
     setAddError("");
@@ -63,10 +58,27 @@ const AdminDashboard = () => {
       setAddSuccess(
         `Employee added successfully! Generated ID: ${response.data.EmployeeID}`
       );
-      setNewEmployee({ Email: "", FirstName: "", LastName: "" }); // Reset form
+      setNewEmployee({ Email: "", FirstName: "", LastName: "" });
     } catch (err) {
       setAddError("Failed to add employee. Please try again.");
       console.error("Error adding employee:", err);
+    }
+  };
+
+  // 🗑️ Delete a time off record
+  const deleteTimeOffRecord = async (timeOffID) => {
+    const confirm = window.confirm("Are you sure you want to delete this time off entry?");
+    if (!confirm) return;
+
+    try {
+      await axios.delete(`http://localhost:5000/api/timeoff/${timeOffID}`);
+      setEmployeeData((prev) => ({
+        ...prev,
+        timeOffRecords: prev.timeOffRecords.filter(rec => rec.TimeOffID !== timeOffID),
+      }));
+    } catch (err) {
+      console.error("Error deleting time off record:", err);
+      alert("Failed to delete time off record.");
     }
   };
 
@@ -94,10 +106,8 @@ const AdminDashboard = () => {
               </button>
             </div>
 
-            {/* Display Errors */}
             {error && <p className="text-danger">{error}</p>}
 
-            {/* Display Results */}
             {employeeData && (
               <div className="mt-4">
                 <h4>
@@ -153,6 +163,7 @@ const AdminDashboard = () => {
                                           <th>StartDate</th>
                                           <th>EndDate</th>
                                           <th>HoursOff</th>
+                                          <th>Actions</th>
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -162,6 +173,14 @@ const AdminDashboard = () => {
                                             <td>{record.StartDate?.split("T")[0]}</td>
                                             <td>{record.EndDate?.split("T")[0]}</td>
                                             <td>{record.HoursOff}</td>
+                                            <td>
+                                              <button
+                                                className="btn btn-sm btn-danger"
+                                                onClick={() => deleteTimeOffRecord(record.TimeOffID)}
+                                              >
+                                                Delete
+                                              </button>
+                                            </td>
                                           </tr>
                                         ))}
                                       </tbody>
